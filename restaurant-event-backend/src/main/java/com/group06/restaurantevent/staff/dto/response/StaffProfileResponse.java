@@ -1,5 +1,6 @@
 package com.group06.restaurantevent.staff.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
 
@@ -20,4 +21,9 @@ public class StaffProfileResponse {
     private LocalDate joinedDate;
     private boolean isActive;
     private Set<String> roles;
+
+    @JsonProperty("isActive")
+    public boolean isActive() {
+        return isActive;
+    }
 }

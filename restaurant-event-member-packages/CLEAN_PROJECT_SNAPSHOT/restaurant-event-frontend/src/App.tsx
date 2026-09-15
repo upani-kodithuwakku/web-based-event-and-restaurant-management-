@@ -21,6 +21,7 @@ import AdminStaff from './pages/admin/Staff';
 import AdminReports from './pages/admin/Reports';
 import KitchenOrders from './pages/admin/Kitchen';
 import CashierDashboard from './pages/admin/Cashier';
+import AdminUsers from './pages/admin/Users';
 
 const STAFF_ROLES = ['ADMIN', 'MANAGER', 'WAITER', 'KITCHEN_STAFF', 'EVENT_COORDINATOR', 'CASHIER', 'INVENTORY_MANAGER'];
 
@@ -70,6 +71,7 @@ function AppRoutes() {
         <Route path="reports" element={<AdminReports />} />
         <Route path="kitchen" element={<KitchenOrders />} />
         <Route path="cashier" element={<CashierDashboard />} />
+        <Route path="users" element={<AdminUsers />} />
       </Route>
     </Routes>
   );

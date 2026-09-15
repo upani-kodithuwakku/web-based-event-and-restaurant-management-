@@ -16,6 +16,8 @@ export default function AdminStaff() {
   const [tab, setTab] = useState<'staff' | 'shifts'>('staff');
   const [date, setDate] = useState(TODAY);
   const [loading, setLoading] = useState(true);
+  const [staffLoading, setStaffLoading] = useState(true);
+  const [staffError, setStaffError] = useState('');
   const [modal, setModal] = useState<'shift' | 'add-staff' | 'reset-pw' | null>(null);
   const [shiftForm, setShiftForm] = useState({ shiftDate: TODAY, startTime: '10:00', endTime: '18:00', roleRequired: 'WAITER', requiredStaffCount: 2 });
   const [staffForm, setStaffForm] = useState(BLANK_USER);
@@ -25,8 +27,11 @@ export default function AdminStaff() {
   const [err, setErr] = useState('');
 
   const loadStaff = async () => {
+    setStaffLoading(true);
+    setStaffError('');
     try { setStaff(await staffApi.list()); }
-    catch { /* non-fatal */ }
+    catch (e) { setStaffError(errorMessage(e)); }
+    finally { setStaffLoading(false); }
   };
 
   const loadShifts = async () => {
@@ -41,6 +46,7 @@ export default function AdminStaff() {
 
   const createStaffUser = async () => {
     if (!staffForm.fullName || !staffForm.email || !staffForm.password) { setErr('Full name, email, and password are required.'); return; }
+    if (staffForm.password.length < 8) { setErr('Password must be at least 8 characters.'); return; }
     if (staffForm.roles.length === 0) { setErr('Select at least one role.'); return; }
     setBusy(true); setErr('');
     try {
@@ -125,6 +131,13 @@ export default function AdminStaff() {
 
       {tab === 'staff' && (
         <div className="staff-grid" style={{ marginTop: 24 }}>
+          {staffLoading && <div className="skeleton" style={{ height: 120 }} />}
+          {staffError && (
+            <div role="alert">
+              <p className="error">Failed to load staff: {staffError}</p>
+              <button className="button" disabled={staffLoading} onClick={() => void loadStaff()}>Retry</button>
+            </div>
+          )}
           {staff.filter(s => s.isActive).map(s => (
             <div key={s.id} className="staff-card">
               <div className="staff-avatar">{(s.fullName || s.employeeCode).slice(0, 2).toUpperCase()}</div>
@@ -142,8 +155,8 @@ export default function AdminStaff() {
               </button>
             </div>
           ))}
-          {staff.length === 0 && (
-            <Empty title="No staff members yet">
+          {!staffLoading && !staffError && staff.filter(s => s.isActive).length === 0 && (
+            <Empty title="No active staff members">
               <p>Click <b>Add Staff Member</b> to create the first account.</p>
             </Empty>
           )}

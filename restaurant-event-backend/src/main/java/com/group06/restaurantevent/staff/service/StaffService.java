@@ -84,6 +84,7 @@ public class StaffService {
 
     // ---- Staff listing — all non-CUSTOMER users from DB ----
 
+    @Transactional(readOnly = true)
     public List<StaffProfileResponse> listStaff() {
         return userRepository.findAllExcludingRole("CUSTOMER")
                 .stream().map(u -> {
@@ -92,6 +93,7 @@ public class StaffService {
                 }).toList();
     }
 
+    @Transactional(readOnly = true)
     public StaffProfileResponse getStaff(Long id) {
         StaffProfile p = profileRepository.findById(id).orElse(null);
         if (p != null) {

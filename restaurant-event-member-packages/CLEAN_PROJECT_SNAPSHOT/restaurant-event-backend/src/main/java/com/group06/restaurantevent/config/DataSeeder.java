@@ -7,6 +7,7 @@ import com.group06.restaurantevent.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,11 +24,16 @@ public class DataSeeder implements CommandLineRunner {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @Value("${app.seed.demo-users:false}")
+    private boolean seedDemoUsers;
+
     @Override
     @Transactional
     public void run(String... args) {
         seedRoles();
-        seedAdminUser();
+        if (seedDemoUsers) {
+            seedAdminUser();
+        }
     }
 
     private void seedRoles() {

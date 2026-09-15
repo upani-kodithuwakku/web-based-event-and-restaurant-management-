@@ -20,6 +20,14 @@ export const userApi = {
  update: async (body: {fullName: string; phone?: string}) => (await api.put<{data: User}>('/users/me', body)).data.data,
 };
 
+export type AdminUserDto = { id: number; fullName: string; email: string; phone: string; roles: string[]; isActive: boolean };
+export const adminUserApi = {
+ list: async () => (await api.get<AdminUserDto[]>('/admin/users')).data,
+ suspend: async (id: number, active: boolean) => (await api.patch<AdminUserDto>(`/admin/users/${id}/suspend`, { active })).data,
+ resetPassword: async (id: number, password: string) => api.post(`/admin/users/${id}/reset-password`, { password }),
+ deactivate: async (id: number) => api.delete(`/admin/users/${id}`),
+};
+
 // Inventory — returns plain arrays (no data wrapper)
 export type InventoryItemDto = { id: number; name: string; unit: string; currentQuantity: number; reorderLevel: number; lowStock: boolean; isActive: boolean };
 export const inventoryApi = {

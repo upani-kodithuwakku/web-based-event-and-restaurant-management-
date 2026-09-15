@@ -6,6 +6,7 @@ import {
   SparklesIcon,
   ArchiveBoxIcon,
   UserGroupIcon,
+  UsersIcon,
   ChartBarIcon,
   FireIcon,
   BanknotesIcon,
@@ -26,6 +27,7 @@ const ALL_NAV: NavItem[] = [
   { label: 'Cashier',      to: '/admin/cashier',      icon: BanknotesIcon,               roles: ['ADMIN', 'MANAGER', 'CASHIER'] },
   { label: 'Inventory',    to: '/admin/inventory',    icon: ArchiveBoxIcon,              roles: ['ADMIN', 'MANAGER', 'INVENTORY_MANAGER'] },
   { label: 'Staff',        to: '/admin/staff',        icon: UserGroupIcon,               roles: ['ADMIN', 'MANAGER'] },
+  { label: 'Users',        to: '/admin/users',        icon: UsersIcon,                   roles: ['ADMIN', 'MANAGER'] },
   { label: 'Reports',      to: '/admin/reports',      icon: ChartBarIcon,                roles: ['ADMIN', 'MANAGER'] },
 ];
 

@@ -200,7 +200,9 @@ Frontend is now running at: **http://localhost:5173**
 
 ## Login Credentials (Real Backend Mode)
 
-When the backend starts, it seeds the following default accounts:
+Demo accounts are disabled by default. Required role records are initialized automatically, so admins can add real staff without sample data. Existing accounts are preserved.
+
+For a fresh local database only, you can opt into the accounts below by setting `SEED_DEMO_USERS=true` before starting the backend. Turn it off after setup and use your existing admin account to add staff.
 
 | Role | Email | Password |
 |------|-------|----------|
@@ -213,7 +215,7 @@ When the backend starts, it seeds the following default accounts:
 | Inventory Manager | `inventory@gather.com` | `Inventory@1234` |
 | Customer | `customer@gather.com` | `Customer@1234` |
 
-> These are seeded automatically by the backend on first startup. Check your backend's `DataSeeder` or `ApplicationRunner` class for the seed logic.
+> With demo seeding disabled, a fresh database needs an administrator provisioned before you can access the admin area. Disabling seeding does not delete previously seeded accounts.
 
 To **register a new customer account**, go to: **http://localhost:5173/register**
 

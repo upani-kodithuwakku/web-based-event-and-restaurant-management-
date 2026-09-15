@@ -82,20 +82,27 @@ public class StaffService {
         return toProfileResponse(profileRepository.save(profile), user);
     }
 
-    // ---- Staff listing (P6 — enriched with user data) ----
+    // ---- Staff listing — all non-CUSTOMER users from DB ----
 
+    @Transactional(readOnly = true)
     public List<StaffProfileResponse> listStaff() {
-        return profileRepository.findByIsActiveTrueOrderByEmployeeCodeAsc()
-                .stream().map(p -> {
-                    User u = userRepository.findById(p.getUserId()).orElse(null);
-                    return toProfileResponse(p, u);
+        return userRepository.findAllExcludingRole("CUSTOMER")
+                .stream().map(u -> {
+                    StaffProfile p = profileRepository.findByUserId(u.getId()).orElse(null);
+                    return toUserResponse(u, p);
                 }).toList();
     }
 
+    @Transactional(readOnly = true)
     public StaffProfileResponse getStaff(Long id) {
-        StaffProfile p = findProfile(id);
-        User u = userRepository.findById(p.getUserId()).orElse(null);
-        return toProfileResponse(p, u);
+        StaffProfile p = profileRepository.findById(id).orElse(null);
+        if (p != null) {
+            User u = userRepository.findById(p.getUserId()).orElse(null);
+            return toProfileResponse(p, u);
+        }
+        User u = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Staff not found: " + id));
+        return toUserResponse(u, null);
     }
 
     // ---- Profile update ----
@@ -252,6 +259,23 @@ public class StaffService {
                 .employmentStatus(p.getEmploymentStatus().name())
                 .joinedDate(p.getJoinedDate())
                 .isActive(p.isActive())
+                .roles(roles)
+                .build();
+    }
+
+    private StaffProfileResponse toUserResponse(User u, StaffProfile p) {
+        Set<String> roles = u.getRoles().stream().map(Role::getName).collect(Collectors.toSet());
+        return StaffProfileResponse.builder()
+                .id(p != null ? p.getId() : u.getId())
+                .userId(u.getId())
+                .employeeCode(p != null ? p.getEmployeeCode() : "—")
+                .fullName(u.getFullName())
+                .email(u.getEmail())
+                .phone(u.getPhone())
+                .jobTitle(p != null ? p.getJobTitle() : null)
+                .employmentStatus(p != null ? p.getEmploymentStatus().name() : "FULL_TIME")
+                .joinedDate(p != null ? p.getJoinedDate() : null)
+                .isActive(u.isActive())
                 .roles(roles)
                 .build();
     }
