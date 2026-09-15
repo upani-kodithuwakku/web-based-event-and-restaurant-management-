@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { CalendarDaysIcon, ClockIcon, UsersIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { useApp } from '../../context/AppContext';
 import { Badge, SectionHeading } from '../../components/UI';
-import { demoMode, errorMessage, reservationApi } from '../../services/api';
+import { errorMessage, reservationApi } from '../../services/api';
 import { tableTitle } from '../../data';
 import type { Reservation } from '../../types';
 
@@ -14,7 +13,6 @@ const ACTIONS: Record<string, { label: string; next: string }[]> = {
 };
 
 export default function AdminReservations() {
-  const { reservations: demoRes, setReservations, tables, setTables } = useApp();
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [statusFilter, setStatusFilter] = useState('');
   const [rows, setRows] = useState<Reservation[]>([]);
@@ -24,39 +22,19 @@ export default function AdminReservations() {
   const [query, setQuery] = useState('');
 
   const load = async () => {
-    if (demoMode) {
-      setRows(demoRes.filter(r => r.reservationDate === date));
-      return;
-    }
     setLoading(true); setErr('');
     try { setRows(await reservationApi.daily(date)); }
     catch (e) { setErr(errorMessage(e)); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { void load(); }, [date, demoRes]);
+  useEffect(() => { void load(); }, [date]);
 
   const doAction = async (id: number, action: string) => {
     setBusy(true); setErr('');
     try {
-      if (demoMode) {
-        const STATUS_MAP: Record<string, string> = {
-          'check-in': 'CHECKED_IN', complete: 'COMPLETED', 'no-show': 'NO_SHOW', confirm: 'CONFIRMED',
-        };
-        const newStatus = STATUS_MAP[action];
-        setReservations(all => all.map(r => r.id === id ? { ...r, status: newStatus } : r));
-        if (action === 'check-in') {
-          const res = demoRes.find(r => r.id === id);
-          if (res) setTables(all => all.map(t => t.id === res.table.id ? { ...t, currentStatus: 'OCCUPIED' } : t));
-        }
-        if (action === 'complete') {
-          const res = demoRes.find(r => r.id === id);
-          if (res) setTables(all => all.map(t => t.id === res.table.id ? { ...t, currentStatus: 'AVAILABLE' } : t));
-        }
-      } else {
-        const updated = await reservationApi.action(id, action);
-        setRows(all => all.map(r => r.id === id ? updated : r));
-      }
+      const updated = await reservationApi.action(id, action);
+      setRows(all => all.map(r => r.id === id ? updated : r));
     } catch (e) { setErr(errorMessage(e)); }
     finally { setBusy(false); }
   };
@@ -69,26 +47,16 @@ export default function AdminReservations() {
 
   return (
     <div className="page-enter">
-      <SectionHeading
-        eyebrow="STAFF VIEW"
-        title="Reservation calendar"
-        description="Check in guests, mark completions, and manage today's floor."
-      />
+      <SectionHeading eyebrow="STAFF VIEW" title="Reservation calendar" description="Check in guests, mark completions, and manage today's floor." />
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24, alignItems: 'center' }}>
         <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8, textTransform: 'none', letterSpacing: 0, fontSize: 14, fontWeight: 600, minWidth: 0 }}>
           <CalendarDaysIcon style={{ width: 16, height: 16 }} />
           <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ border: '1.5px solid var(--gray-200)', borderRadius: 'var(--radius-sm)', padding: '8px 12px', fontSize: 14, background: 'var(--white)' }} />
         </label>
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          style={{ padding: '8px 14px', border: '1.5px solid var(--gray-200)', borderRadius: 'var(--radius-sm)', fontSize: 14, background: 'var(--white)', cursor: 'pointer' }}
-        >
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ padding: '8px 14px', border: '1.5px solid var(--gray-200)', borderRadius: 'var(--radius-sm)', fontSize: 14, background: 'var(--white)', cursor: 'pointer' }}>
           <option value="">All statuses</option>
-          {['PENDING', 'CONFIRMED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED', 'NO_SHOW'].map(s => (
-            <option key={s} value={s}>{s.replace('_', ' ')}</option>
-          ))}
+          {['PENDING', 'CONFIRMED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED', 'NO_SHOW'].map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
         </select>
         <div className="inline-search" style={{ flex: 1, minWidth: 180 }}>
           <MagnifyingGlassIcon />
@@ -115,23 +83,14 @@ export default function AdminReservations() {
                   {r.guestCount} ·
                   <ClockIcon style={{ width: 12, height: 12, display: 'inline', marginLeft: 6, marginRight: 2 }} />
                   {r.startTime.slice(0, 5)}
-                  <span style={{ fontSize: 11, letterSpacing: '.04em', color: 'var(--gray-300)', marginLeft: 8 }}>
-                    {r.bookingReference}
-                  </span>
+                  <span style={{ fontSize: 11, letterSpacing: '.04em', color: 'var(--gray-300)', marginLeft: 8 }}>{r.bookingReference}</span>
                 </p>
-                {r.specialRequest && (
-                  <p style={{ fontStyle: 'italic', color: 'var(--foggy)', fontSize: 12 }}>"{r.specialRequest}"</p>
-                )}
+                {r.specialRequest && <p style={{ fontStyle: 'italic', color: 'var(--foggy)', fontSize: 12 }}>"{r.specialRequest}"</p>}
               </div>
               <Badge status={r.status} />
               <div className="tl-actions">
                 {(ACTIONS[r.status] ?? []).map(({ label, next }) => (
-                  <button
-                    key={next}
-                    className={next === 'check-in' || next === 'complete' || next === 'confirm' ? 'primary' : ''}
-                    disabled={busy}
-                    onClick={() => doAction(r.id, next)}
-                  >
+                  <button key={next} className={next === 'check-in' || next === 'complete' || next === 'confirm' ? 'primary' : ''} disabled={busy} onClick={() => doAction(r.id, next)}>
                     {label}
                   </button>
                 ))}
@@ -143,7 +102,6 @@ export default function AdminReservations() {
 
       <p className="small muted" style={{ marginTop: 16 }}>
         Showing {filtered.length} reservation{filtered.length !== 1 ? 's' : ''} for {date}.
-        {demoMode && ' Demo mode — changes are saved locally.'}
       </p>
     </div>
   );

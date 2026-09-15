@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PlusIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import { useApp } from '../../context/AppContext';
 import { Badge, Modal, SectionHeading } from '../../components/UI';
-import { demoMode, errorMessage, reservationApi } from '../../services/api';
+import { errorMessage, reservationApi } from '../../services/api';
 import type { Table } from '../../types';
 
 const LOCATIONS = ['GARDEN', 'WINDOW', 'INDOOR', 'OUTDOOR', 'PRIVATE'];
@@ -19,25 +19,24 @@ export default function AdminTables() {
   const [err, setErr] = useState('');
   const [statusBusy, setStatusBusy] = useState<number | null>(null);
 
+  useEffect(() => {
+    reservationApi.tables().then(setTables).catch(() => {});
+  }, []);
+
   const openNew = () => { setForm(EMPTY); setModal('new'); setErr(''); };
   const openEdit = (t: Table) => { setForm({ tableNumber: t.tableNumber, capacity: t.capacity, location: t.location }); setModal(t); setErr(''); };
 
   const save = async () => {
     setBusy(true); setErr('');
     try {
-      if (demoMode) {
-        if (modal === 'new') {
-          const newTable: Table = { id: Date.now(), tableNumber: form.tableNumber, capacity: form.capacity, location: form.location, currentStatus: 'AVAILABLE', isActive: true };
-          setTables(all => [newTable, ...all]);
-        } else if (modal) {
-          setTables(all => all.map(t => t.id === (modal as Table).id ? { ...t, ...form } : t));
-        }
-        setModal(null);
-      } else {
-        const endpoint = modal === 'new' ? reservationApi.tables : () => Promise.resolve([]);
-        await endpoint();
-        setModal(null);
+      if (modal === 'new') {
+        const created = await reservationApi.createTable(form);
+        setTables(all => [created, ...all]);
+      } else if (modal) {
+        const updated = await reservationApi.updateTable((modal as Table).id, form);
+        setTables(all => all.map(t => t.id === updated.id ? updated : t));
       }
+      setModal(null);
     } catch (e) { setErr(errorMessage(e)); }
     finally { setBusy(false); }
   };
@@ -45,18 +44,10 @@ export default function AdminTables() {
   const changeStatus = async (t: Table, status: string) => {
     setStatusBusy(t.id); setErr('');
     try {
-      if (demoMode) {
-        setTables(all => all.map(x => x.id === t.id ? { ...x, currentStatus: status } : x));
-      } else {
-        const updated = await reservationApi.tableStatus(t.id, status);
-        setTables(all => all.map(x => x.id === t.id ? updated : x));
-      }
+      const updated = await reservationApi.tableStatus(t.id, status);
+      setTables(all => all.map(x => x.id === t.id ? updated : x));
     } catch (e) { setErr(errorMessage(e)); }
     finally { setStatusBusy(null); }
-  };
-
-  const toggle = (t: Table) => {
-    if (demoMode) setTables(all => all.map(x => x.id === t.id ? { ...x, isActive: !x.isActive } : x));
   };
 
   return (
@@ -69,7 +60,6 @@ export default function AdminTables() {
       />
 
       {err && <p className="error">{err}</p>}
-      {demoMode && <div className="demo-banner">Demo mode — changes are saved on this device only.</div>}
 
       <div className="admin-table-list">
         {tables.sort((a, b) => a.tableNumber.localeCompare(b.tableNumber)).map(t => (
@@ -81,50 +71,22 @@ export default function AdminTables() {
             </div>
             <Badge status={t.currentStatus} />
             <div className="tr-actions">
-              <select
-                value={t.currentStatus}
-                disabled={statusBusy === t.id}
-                onChange={e => changeStatus(t, e.target.value)}
-                style={{ padding: '6px 10px', border: '1.5px solid var(--gray-200)', borderRadius: 'var(--radius-sm)', fontSize: 13, cursor: 'pointer', background: 'var(--white)' }}
-              >
+              <select value={t.currentStatus} disabled={statusBusy === t.id} onChange={e => changeStatus(t, e.target.value)} style={{ padding: '6px 10px', border: '1.5px solid var(--gray-200)', borderRadius: 'var(--radius-sm)', fontSize: 13, cursor: 'pointer', background: 'var(--white)' }}>
                 {STATUSES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
               </select>
               <button className="icon-button" onClick={() => openEdit(t)} title="Edit table"><PencilSquareIcon style={{ width: 16, height: 16 }} /></button>
-              {demoMode && (
-                <button className="button" style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => toggle(t)}>
-                  {t.isActive ? 'Deactivate' : 'Activate'}
-                </button>
-              )}
             </div>
           </div>
         ))}
       </div>
 
       {modal !== null && (
-        <Modal
-          title={modal === 'new' ? 'Add a new table' : `Edit ${(modal as Table).tableNumber}`}
-          onClose={() => setModal(null)}
-        >
+        <Modal title={modal === 'new' ? 'Add a new table' : `Edit ${(modal as Table).tableNumber}`} onClose={() => setModal(null)}>
           <div className="input-group">
-            <label>
-              Table number
-              <input
-                value={form.tableNumber}
-                onChange={e => setForm({ ...form, tableNumber: e.target.value })}
-                placeholder="e.g. T11"
-              />
-            </label>
+            <label>Table number<input value={form.tableNumber} onChange={e => setForm({ ...form, tableNumber: e.target.value })} placeholder="e.g. T11" /></label>
             <div className="form-row">
-              <label>
-                Capacity (guests)
-                <input
-                  type="number" min={1} max={30}
-                  value={form.capacity}
-                  onChange={e => setForm({ ...form, capacity: Number(e.target.value) })}
-                />
-              </label>
-              <label>
-                Location / seating area
+              <label>Capacity (guests)<input type="number" min={1} max={30} value={form.capacity} onChange={e => setForm({ ...form, capacity: Number(e.target.value) })} /></label>
+              <label>Location / seating area
                 <select value={form.location} onChange={e => setForm({ ...form, location: e.target.value })}>
                   {LOCATIONS.map(l => <option key={l} value={l}>{l.charAt(0) + l.slice(1).toLowerCase()}</option>)}
                 </select>

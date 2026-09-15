@@ -18,13 +18,11 @@ import AdminEvents from './pages/admin/AdminEvents';
 import AdminInventory from './pages/admin/Inventory';
 import AdminStaff from './pages/admin/Staff';
 import AdminReports from './pages/admin/Reports';
-import { demoMode } from './services/api';
-
 const STAFF_ROLES = ['ADMIN', 'MANAGER', 'WAITER', 'KITCHEN_STAFF', 'EVENT_COORDINATOR', 'CASHIER', 'INVENTORY_MANAGER'];
 
 function AdminGuard({ children }: { children: ReactNode }) {
   const { user } = useApp();
-  if (!demoMode && (!user || !user.roles.some(r => STAFF_ROLES.includes(r)))) {
+  if (!user || !user.roles.some(r => STAFF_ROLES.includes(r))) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;

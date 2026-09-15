@@ -1,47 +1,37 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { format, parseISO } from 'date-fns';
-import {
-  CalendarDaysIcon,
-  TableCellsIcon,
-  UsersIcon,
-  CheckCircleIcon,
-  ClockIcon,
-} from '@heroicons/react/24/outline';
+import { format } from 'date-fns';
+import { CalendarDaysIcon, TableCellsIcon, UsersIcon, CheckCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { useApp } from '../../context/AppContext';
 import { Badge } from '../../components/UI';
-import { demoMode, errorMessage, reservationApi } from '../../services/api';
+import { errorMessage, reservationApi } from '../../services/api';
 import { tableTitle } from '../../data';
 
-const statusClass = (s: string) => {
-  const m: Record<string, string> = {
-    AVAILABLE: 'available', RESERVED: 'reserved',
-    OCCUPIED: 'occupied', OUT_OF_SERVICE: 'out-of-service',
-  };
-  return m[s] ?? '';
-};
+const statusClass = (s: string) => ({ AVAILABLE: 'available', RESERVED: 'reserved', OCCUPIED: 'occupied', OUT_OF_SERVICE: 'out-of-service' }[s] ?? '');
 
 export default function AdminDashboard() {
-  const { tables, reservations: demoRes } = useApp();
+  const { tables, setTables } = useApp();
   const today = format(new Date(), 'yyyy-MM-dd');
-  const [adminRes, setAdminRes] = useState(demoRes);
+  const [todayRes, setTodayRes] = useState<Awaited<ReturnType<typeof reservationApi.daily>>>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
-  const todayRes = (demoMode ? demoRes : adminRes).filter(r => r.reservationDate === today);
-  const upcoming = todayRes.filter(r => ['PENDING', 'CONFIRMED', 'CHECKED_IN'].includes(r.status));
+  useEffect(() => {
+    reservationApi.tables().then(setTables).catch(() => {});
+    reservationApi.daily(today).then(setTodayRes).catch(() => {});
+  }, []);
 
+  const upcoming = todayRes.filter(r => ['PENDING', 'CONFIRMED', 'CHECKED_IN'].includes(r.status));
   const available = tables.filter(t => t.currentStatus === 'AVAILABLE').length;
   const occupied  = tables.filter(t => t.currentStatus === 'OCCUPIED').length;
   const reserved  = tables.filter(t => t.currentStatus === 'RESERVED').length;
   const oos       = tables.filter(t => t.currentStatus === 'OUT_OF_SERVICE').length;
 
   const doAction = async (id: number, action: string) => {
-    if (demoMode) return;
     setBusy(true); setErr('');
     try {
       const updated = await reservationApi.action(id, action);
-      setAdminRes(all => all.map(r => r.id === id ? updated : r));
+      setTodayRes(all => all.map(r => r.id === id ? updated : r));
     } catch (e) { setErr(errorMessage(e)); }
     finally { setBusy(false); }
   };
@@ -86,7 +76,7 @@ export default function AdminDashboard() {
           <Link to="/admin/tables" className="text-button">Manage tables →</Link>
         </div>
         <div className="floor-map">
-          {tables.map(t => (
+          {tables.filter(t => t.currentStatus !== 'OUT_OF_SERVICE').map(t => (
             <div key={t.id} className={`table-tile ${statusClass(t.currentStatus)}`}>
               <span className="tile-num">{t.tableNumber}</span>
               <span className="tile-cap">{t.capacity} guests</span>
@@ -121,21 +111,16 @@ export default function AdminDashboard() {
                 <Badge status={r.status} />
                 <div className="tl-actions">
                   {r.status === 'CONFIRMED' && (
-                    <button className="primary" onClick={() => doAction(r.id, 'check-in')} disabled={busy || demoMode}>
-                      Check in
-                    </button>
+                    <button className="primary" onClick={() => doAction(r.id, 'check-in')} disabled={busy}>Check in</button>
                   )}
                   {r.status === 'CHECKED_IN' && (
-                    <button className="primary" onClick={() => doAction(r.id, 'complete')} disabled={busy || demoMode}>
-                      Complete
-                    </button>
+                    <button className="primary" onClick={() => doAction(r.id, 'complete')} disabled={busy}>Complete</button>
                   )}
                 </div>
               </div>
             ))}
           </div>
         )}
-        {demoMode && <p className="small muted" style={{ marginTop: 12 }}>Demo mode · check-in and complete actions work in the full reservations panel.</p>}
       </section>
     </div>
   );

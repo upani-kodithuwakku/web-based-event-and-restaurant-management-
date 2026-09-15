@@ -54,18 +54,30 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedAdminUser() {
-        if (userRepository.existsByEmail("admin@restaurant.com")) return;
+        seedUser("Admin User",        "admin@gather.com",     "0711000001", "Admin@1234",     "ADMIN");
+        seedUser("Manager User",      "manager@gather.com",   "0711000002", "Manager@1234",   "MANAGER");
+        seedUser("Waiter User",       "waiter@gather.com",    "0711000003", "Waiter@1234",    "WAITER");
+        seedUser("Kitchen Staff",     "kitchen@gather.com",   "0711000004", "Kitchen@1234",   "KITCHEN_STAFF");
+        seedUser("Events Coordinator","events@gather.com",    "0711000005", "Events@1234",    "EVENT_COORDINATOR");
+        seedUser("Cashier User",      "cashier@gather.com",   "0711000006", "Cashier@1234",   "CASHIER");
+        seedUser("Inventory Manager", "inventory@gather.com", "0711000007", "Inventory@1234", "INVENTORY_MANAGER");
+        seedUser("Customer User",     "customer@gather.com",  "0711000008", "Customer@1234",  "CUSTOMER");
+    }
 
-        Role adminRole = roleRepository.findByName("ADMIN").orElseThrow();
-        User admin = User.builder()
-                .fullName("System Admin")
-                .email("admin@restaurant.com")
-                .phone("0711000000")
-                .passwordHash(passwordEncoder.encode("Admin@123"))
+    private void seedUser(String fullName, String email, String phone,
+                          String password, String roleName) {
+        if (userRepository.existsByEmail(email)) return;
+        Role role = roleRepository.findByName(roleName).orElseThrow(
+                () -> new IllegalStateException("Role not found: " + roleName));
+        User user = User.builder()
+                .fullName(fullName)
+                .email(email)
+                .phone(phone)
+                .passwordHash(passwordEncoder.encode(password))
                 .isActive(true)
-                .roles(Set.of(adminRole))
+                .roles(Set.of(role))
                 .build();
-        userRepository.save(admin);
-        log.info("Seeded admin user: admin@restaurant.com / Admin@123");
+        userRepository.save(user);
+        log.info("Seeded user: {} / {}", email, roleName);
     }
 }
