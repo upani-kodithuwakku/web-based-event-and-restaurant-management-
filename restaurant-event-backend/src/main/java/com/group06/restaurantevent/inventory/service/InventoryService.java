@@ -52,11 +52,16 @@ public class InventoryService {
         item.setName(req.getName());
         item.setUnit(req.getUnit());
         item.setReorderLevel(req.getReorderLevel());
+        BigDecimal delta = req.getCurrentQuantity().subtract(item.getCurrentQuantity());
+        if (delta.signum() != 0) {
+            adjustStock(id, delta, "Quantity updated from inventory editor");
+        }
         return toResponse(itemRepository.save(item));
     }
 
     @Transactional
     public InventoryItemResponse adjustStock(Long id, BigDecimal delta, String note) {
+        if (delta == null || delta.signum() == 0) throw new BadRequestException("Stock adjustment must be non-zero");
         InventoryItem item = findItem(id);
         BigDecimal newQty = item.getCurrentQuantity().add(delta);
         if (newQty.compareTo(BigDecimal.ZERO) < 0)
@@ -85,7 +90,7 @@ public class InventoryService {
     }
 
     public InventoryItem findItem(Long id) {
-        return itemRepository.findById(id)
+        return itemRepository.findById(id).filter(InventoryItem::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory item not found: " + id));
     }
 

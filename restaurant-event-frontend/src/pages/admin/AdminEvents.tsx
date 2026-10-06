@@ -1,17 +1,17 @@
+import EventCatalogManager from '../../components/EventCatalogManager';
+import { BookingPaymentBadge } from '../../components/BookingPayment';
+import { customerPaymentApi, type CustomerPaymentDto } from '../../services/api';
 import { useState, useEffect } from 'react';
 import { SparklesIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import { Badge, Empty, Modal, SectionHeading } from '../../components/UI';
 import { eventCoordinatorApi, type EventBookingDto, errorMessage } from '../../services/api';
 import { money } from '../../data';
 
-const PACKAGES = [
-  { name: 'The intimate gathering', type: 'Birthdays & get-togethers', min: 10, max: 30, price: 45000 },
-  { name: 'A day to remember',      type: 'Weddings & engagements',   min: 30, max: 120, price: 180000 },
-  { name: 'Beyond the boardroom',   type: 'Teams & corporate events',  min: 10, max: 60, price: 85000 },
-];
-
 export default function AdminEvents() {
   const [events, setEvents] = useState<EventBookingDto[]>([]);
+  const [payments, setPayments] = useState<CustomerPaymentDto[]>([]);
+  const [paymentError, setPaymentError] = useState('');
+  useEffect(() => { let active = true; const load = () => customerPaymentApi.events().then(data => { if (active) { setPayments(data); setPaymentError(''); } }).catch(e => { if (active) setPaymentError(errorMessage(e)); }); void load(); const timer = window.setInterval(() => void load(), 20000); return () => { active = false; window.clearInterval(timer); }; }, []);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
   const [selected, setSelected] = useState<EventBookingDto | null>(null);
@@ -39,6 +39,7 @@ export default function AdminEvents() {
   };
 
   const reject = async (id: number) => {
+    if (!rejectNote.trim()) { setErr("Please enter a rejection reason."); return; }
     setBusy(true); setErr('');
     try {
       const updated = await eventCoordinatorApi.reject(id, rejectNote);
@@ -85,6 +86,7 @@ export default function AdminEvents() {
                   {e.specialRequirements && <span style={{ marginLeft: 8, fontStyle: 'italic' }}>— "{e.specialRequirements.slice(0, 60)}{e.specialRequirements.length > 60 ? '…' : ''}"</span>}
                 </p>
               </div>
+              {paymentError ? <span className="muted small">Payment status unavailable</span> : <BookingPaymentBadge payment={payments.find(p => p.eventBookingId === e.id)} />}
               <Badge status={e.status} />
               <div className="eb-actions">
                 {e.status === 'PENDING' && (
@@ -102,20 +104,7 @@ export default function AdminEvents() {
         </div>
       )}
 
-      <section style={{ marginTop: 32 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Event packages reference</h2>
-        <div className="report-grid">
-          {PACKAGES.map(pkg => (
-            <div key={pkg.name} className="report-card">
-              <h3>{pkg.name}</h3>
-              <div className="report-row"><span>Type</span><b>{pkg.type}</b></div>
-              <div className="report-row"><span>Capacity</span><b>{pkg.min}–{pkg.max} guests</b></div>
-              <div className="report-row"><span>Starting from</span><b>{money(pkg.price)}</b></div>
-              <div className="report-row"><span>Enquiries</span><b>{events.filter(e => e.packageName === pkg.name).length}</b></div>
-            </div>
-          ))}
-        </div>
-      </section>
+      <EventCatalogManager />
 
       {selected && (
         <Modal title="Event booking details" onClose={() => setSelected(null)}>
@@ -143,7 +132,7 @@ export default function AdminEvents() {
             {selected.status === 'PENDING' && (
               <>
                 <div className="divider" />
-                <label>Rejection reason (optional)<textarea value={rejectNote} onChange={e => setRejectNote(e.target.value)} placeholder="Let the customer know why (optional)…" /></label>
+                <label>Rejection reason<textarea maxLength={500} value={rejectNote} onChange={e => setRejectNote(e.target.value)} placeholder="Let the customer know why…" /></label>
                 {err && <p className="error">{err}</p>}
                 <div className="button-row">
                   <button className="button primary" disabled={busy} onClick={() => approve(selected.id)}>Approve booking</button>

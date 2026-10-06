@@ -1,5 +1,5 @@
 export type Role = 'CUSTOMER' | 'ADMIN' | 'MANAGER' | 'WAITER' | 'KITCHEN_STAFF' | 'EVENT_COORDINATOR' | 'CASHIER' | 'INVENTORY_MANAGER';
-export type Table = { id: number; tableNumber: string; capacity: number; location: string; currentStatus: string; isActive: boolean };
+export type Table = { id: number; tableNumber: string; capacity: number; displayName?: string; description?: string; imageUrl?: string; location: string; currentStatus: string; isActive: boolean };
 export type Reservation = { id: number; bookingReference: string; table: Table; reservationDate: string; startTime: string; guestCount: number; status: string; contactName: string; contactPhone: string; specialRequest?: string };
 export type BookingInput = { tableId: number; reservationDate: string; startTime: string; guestCount: number; seatingPreference?: string; specialRequest?: string; contactName: string; contactPhone: string };
 export type User = { userId: number; fullName: string; email: string; roles: Role[]; token?: string; phone?: string };

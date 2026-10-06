@@ -14,5 +14,6 @@ public class InventoryItemResponse {
     private BigDecimal currentQuantity;
     private BigDecimal reorderLevel;
     private boolean lowStock;
+    @com.fasterxml.jackson.annotation.JsonProperty("isActive")
     private boolean isActive;
 }

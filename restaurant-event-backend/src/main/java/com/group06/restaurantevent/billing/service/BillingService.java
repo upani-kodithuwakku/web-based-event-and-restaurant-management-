@@ -114,7 +114,7 @@ public class BillingService {
                 .amount(invoice.getTotalAmount())
                 .method(method)
                 .status(PaymentStatus.PAID)
-                .paidAt(LocalDateTime.now())
+                .paidAt(LocalDateTime.now(java.time.ZoneId.of("Asia/Colombo")))
                 .gatewayReference("SIM-" + System.currentTimeMillis())
                 .build();
 

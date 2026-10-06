@@ -6,6 +6,8 @@ import Layout from './components/Layout';
 import AdminLayout from './components/AdminLayout';
 import Discover from './pages/Discover';
 import Auth from './pages/Auth';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Reservations from './pages/Reservations';
 import Menu from './pages/Menu';
 import Events from './pages/Events';
@@ -13,6 +15,8 @@ import Profile from './pages/Profile';
 import CustomerDashboard from './pages/CustomerDashboard';
 import NotFound from './pages/shared/NotFound';
 import AdminDashboard from './pages/admin/Dashboard';
+import Suppliers from './pages/admin/Suppliers';
+import AdminMenu from './pages/admin/Menu';
 import AdminTables from './pages/admin/Tables';
 import AdminReservations from './pages/admin/AdminReservations';
 import AdminEvents from './pages/admin/AdminEvents';
@@ -22,6 +26,9 @@ import AdminReports from './pages/admin/Reports';
 import KitchenOrders from './pages/admin/Kitchen';
 import CashierDashboard from './pages/admin/Cashier';
 import AdminUsers from './pages/admin/Users';
+import FoodRequests from './pages/admin/FoodRequests';
+import Payments from './pages/Payments';
+import CustomerPayments from './pages/admin/CustomerPayments';
 
 const STAFF_ROLES = ['ADMIN', 'MANAGER', 'WAITER', 'KITCHEN_STAFF', 'EVENT_COORDINATOR', 'CASHIER', 'INVENTORY_MANAGER'];
 
@@ -50,8 +57,11 @@ function AppRoutes() {
         <Route path="reservations" element={<Reservations />} />
         <Route path="profile" element={<Profile />} />
         <Route path="dashboard" element={<CustomerGuard><CustomerDashboard /></CustomerGuard>} />
+        <Route path="payments" element={<CustomerGuard><Payments /></CustomerGuard>} />
         <Route path="login" element={<Auth />} />
         <Route path="register" element={<Auth register />} />
+        <Route path="forgot-password" element={<ForgotPassword />} />
+        <Route path="reset-password" element={<ResetPassword />} />
         <Route path="*" element={<NotFound />} />
       </Route>
       <Route
@@ -63,6 +73,8 @@ function AppRoutes() {
         }
       >
         <Route index element={<AdminDashboard />} />
+        <Route path="menu" element={<AdminMenu />} />
+        <Route path="suppliers" element={<Suppliers />} />
         <Route path="tables" element={<AdminTables />} />
         <Route path="reservations" element={<AdminReservations />} />
         <Route path="events" element={<AdminEvents />} />
@@ -72,6 +84,8 @@ function AppRoutes() {
         <Route path="kitchen" element={<KitchenOrders />} />
         <Route path="cashier" element={<CashierDashboard />} />
         <Route path="users" element={<AdminUsers />} />
+        <Route path="food-requests" element={<FoodRequests />} />
+        <Route path="payments" element={<CustomerPayments />} />
       </Route>
     </Routes>
   );

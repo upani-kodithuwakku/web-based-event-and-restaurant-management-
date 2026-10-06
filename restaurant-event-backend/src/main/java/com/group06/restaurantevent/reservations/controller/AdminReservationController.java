@@ -30,6 +30,7 @@ import java.util.List;
 @PreAuthorize("hasAnyRole('ADMIN','MANAGER','WAITER')")
 public class AdminReservationController {
 
+    private final com.group06.restaurantevent.common.audit.AuditLogRepository auditLogs;
     private final TableService tableService;
     private final ReservationService reservationService;
 
@@ -74,6 +75,15 @@ public class AdminReservationController {
 
     // ---------- Reservation Management ----------
 
+    @PostMapping("/reservations")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public ResponseEntity<ApiResponse<ReservationResponse>> createReservation(
+            @RequestParam String customerEmail,
+            @Valid @RequestBody com.group06.restaurantevent.reservations.dto.request.CreateReservationRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Reservation created",
+                reservationService.createForCustomer(customerEmail, request)));
+    }
+
     @GetMapping("/reservations")
     @Operation(summary = "Get reservations by date and status")
     public ResponseEntity<ApiResponse<List<ReservationResponse>>> getReservations(
@@ -82,6 +92,22 @@ public class AdminReservationController {
         LocalDate queryDate = date != null ? date : LocalDate.now();
         return ResponseEntity.ok(ApiResponse.success(
                 reservationService.getReservationsByDate(queryDate, status)));
+    }
+
+    public record ReservationHistory(Long id, Long actorId, String action, String previousStatus,
+                                     String status, java.time.LocalDateTime createdAt) {}
+
+    @GetMapping("/reservations/{id}/history")
+    public ResponseEntity<ApiResponse<List<ReservationHistory>>> history(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(auditLogs
+                .findByEntityNameAndEntityIdOrderByCreatedAtDescIdDesc("TableReservation", id).stream()
+                .map(log -> new ReservationHistory(log.getId(), log.getUserId(), log.getAction(),
+                        log.getOldValue(), log.getNewValue(), log.getCreatedAt())).toList()));
+    }
+
+    @PatchMapping("/reservations/{id}/confirm")
+    public ResponseEntity<ApiResponse<ReservationResponse>> confirm(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(reservationService.confirm(id)));
     }
 
     @PatchMapping("/reservations/{id}/check-in")

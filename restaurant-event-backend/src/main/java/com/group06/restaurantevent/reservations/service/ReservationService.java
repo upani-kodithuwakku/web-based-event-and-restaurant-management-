@@ -6,7 +6,8 @@ import com.group06.restaurantevent.common.exception.BadRequestException;
 import com.group06.restaurantevent.common.exception.ConflictException;
 import com.group06.restaurantevent.common.exception.ForbiddenException;
 import com.group06.restaurantevent.common.exception.ResourceNotFoundException;
-import com.group06.restaurantevent.notifications.service.NotificationFactory;
+import com.group06.restaurantevent.reservations.observer.ReservationSubject;
+import com.group06.restaurantevent.reservations.observer.ReservationEvent;
 import com.group06.restaurantevent.reservations.dto.request.CancelReservationRequest;
 import com.group06.restaurantevent.reservations.dto.request.CreateReservationRequest;
 import com.group06.restaurantevent.reservations.dto.request.UpdateReservationRequest;
@@ -39,12 +40,14 @@ public class ReservationService {
     private final RestaurantTableRepository tableRepository;
     private final UserRepository userRepository;
     private final TableService tableService;
-    private final NotificationFactory notificationFactory;
+    private final ReservationSubject reservationSubject;
+    private final com.group06.restaurantevent.payment.service.CustomerPaymentService paymentService;
 
     @Value("${app.reservation.default-duration-minutes:120}")
     private int defaultDurationMinutes;
 
     public AvailabilityResponse checkAvailability(LocalDate date, LocalTime time, int guests, String preference) {
+        validateSlot(date, time, guests);
         LocalTime endTime = time.plusMinutes(defaultDurationMinutes);
         List<RestaurantTable> candidates = tableRepository.findByCapacityGreaterThanEqualAndIsActiveTrue(guests);
 
@@ -66,10 +69,11 @@ public class ReservationService {
         int[] offsets = {-30, 30, -60, 60, -90, 90};
         for (int offset : offsets) {
             LocalTime alt = time.plusMinutes(offset);
-            if (alt.isBefore(LocalTime.of(9, 0)) || alt.isAfter(LocalTime.of(22, 0))) continue;
+            if (alt.isBefore(LocalTime.of(11, 0)) || alt.isAfter(LocalTime.of(21, 0)) || !date.atTime(alt).isAfter(LocalDateTime.now(java.time.ZoneId.of("Asia/Colombo")))) continue;
             LocalTime altEnd = alt.plusMinutes(defaultDurationMinutes);
             boolean hasSlot = candidates.stream()
                     .filter(t -> t.getCurrentStatus() != TableStatus.OUT_OF_SERVICE)
+                    .filter(t -> preference == null || preference.isBlank() || preference.equalsIgnoreCase(t.getLocation()))
                     .anyMatch(t -> reservationRepository.findOverlapping(t.getId(), date, alt, altEnd).isEmpty());
             if (hasSlot) alternatives.add(alt);
         }
@@ -84,7 +88,17 @@ public class ReservationService {
     }
 
     @Transactional
+    public ReservationResponse createForCustomer(String email, CreateReservationRequest request) {
+        User customer = userRepository.findByEmailAndIsActiveTrue(email.trim().toLowerCase())
+                .orElseThrow(() -> new BadRequestException("Enter the email of an active customer account"));
+        if (customer.getRoles().stream().noneMatch(role -> role.getName().equals("CUSTOMER")))
+            throw new BadRequestException("Reservations must be linked to a customer account");
+        return createReservation(customer.getEmail(), request);
+    }
+
+    @Transactional
     public ReservationResponse createReservation(String email, CreateReservationRequest request) {
+        validateSlot(request.getReservationDate(), request.getStartTime(), request.getGuestCount());
         User customer = findUserByEmail(email);
         RestaurantTable table = tableService.findActiveById(request.getTableId());
 
@@ -118,7 +132,7 @@ public class ReservationService {
                 .build();
 
         reservation = reservationRepository.save(reservation);
-        notificationFactory.reservationConfirmed(customer, reservation.getBookingReference());
+        publishChange(reservation, null, "CREATED");
         return toResponse(reservation);
     }
 
@@ -158,6 +172,8 @@ public class ReservationService {
         LocalTime newEnd = newStart.plusMinutes(defaultDurationMinutes);
         int newGuests = request.getGuestCount() != null ? request.getGuestCount() : reservation.getGuestCount();
 
+        validateSlot(newDate, newStart, newGuests);
+        if (reservation.getTable().getCurrentStatus() == TableStatus.OUT_OF_SERVICE) throw new BadRequestException("Table is out of service");
         if (reservation.getTable().getCapacity() < newGuests) {
             throw new BadRequestException("Table capacity insufficient for updated guest count");
         }
@@ -177,13 +193,15 @@ public class ReservationService {
         if (request.getContactName() != null) reservation.setContactName(request.getContactName());
         if (request.getContactPhone() != null) reservation.setContactPhone(request.getContactPhone());
 
-        return toResponse(reservationRepository.save(reservation));
+        reservationRepository.save(reservation);
+        publishChange(reservation, reservation.getStatus(), "UPDATED");
+        return toResponse(reservation);
     }
 
     @Transactional
     public ReservationResponse cancelReservation(Long id, String email, CancelReservationRequest request) {
         User customer = findUserByEmail(email);
-        TableReservation reservation = findById(id);
+        TableReservation reservation = reservationRepository.findForPayment(id).orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
 
         if (!reservation.getCustomer().getId().equals(customer.getId())) {
             throw new ForbiddenException("You do not have access to this reservation");
@@ -195,10 +213,12 @@ public class ReservationService {
             throw new BadRequestException("Cannot cancel a completed or checked-in reservation");
         }
 
+        ReservationStatus previous = reservation.getStatus();
         reservation.setStatus(ReservationStatus.CANCELLED);
         reservation.setCancelReason(request.getReason());
         reservationRepository.save(reservation);
-        notificationFactory.reservationCancelled(customer, reservation.getBookingReference());
+        paymentService.cancelReservationPayment(id, email);
+        publishChange(reservation, previous, "CANCELLED");
         return toResponse(reservation);
     }
 
@@ -207,7 +227,7 @@ public class ReservationService {
     public List<ReservationResponse> getReservationsByDate(LocalDate date, ReservationStatus status) {
         List<ReservationStatus> statuses = status != null
                 ? List.of(status)
-                : List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN);
+                : List.of(ReservationStatus.values());
         return reservationRepository.findByReservationDateAndStatusIn(date, statuses)
                 .stream().map(this::toResponse).toList();
     }
@@ -222,7 +242,7 @@ public class ReservationService {
         RestaurantTable table = reservation.getTable();
         table.setCurrentStatus(TableStatus.OCCUPIED);
         tableRepository.save(table);
-        notificationFactory.reservationCheckedIn(reservation.getCustomer(), reservation.getBookingReference());
+        publishChange(reservation, ReservationStatus.CONFIRMED, "CHECKED_IN");
         return toResponse(reservationRepository.save(reservation));
     }
 
@@ -236,6 +256,7 @@ public class ReservationService {
         RestaurantTable table = reservation.getTable();
         table.setCurrentStatus(TableStatus.AVAILABLE);
         tableRepository.save(table);
+        publishChange(reservation, ReservationStatus.CHECKED_IN, "COMPLETED");
         return toResponse(reservationRepository.save(reservation));
     }
 
@@ -251,7 +272,37 @@ public class ReservationService {
             table.setCurrentStatus(TableStatus.AVAILABLE);
             tableRepository.save(table);
         }
+        publishChange(reservation, ReservationStatus.CONFIRMED, "NO_SHOW");
         return toResponse(reservationRepository.save(reservation));
+    }
+
+    @Transactional
+    public ReservationResponse confirm(Long id) {
+        TableReservation r = findById(id);
+        if (r.getStatus() != ReservationStatus.PENDING) throw new BadRequestException("Only pending reservations can be confirmed");
+        r.setStatus(ReservationStatus.CONFIRMED);
+        publishChange(r, ReservationStatus.PENDING, "CONFIRMED");
+        return toResponse(reservationRepository.save(r));
+    }
+
+    // Business rules stay in this service. Reactions belong to the observers.
+    // Observers run synchronously in this transaction: any failure rolls back all changes.
+    private void publishChange(TableReservation reservation, ReservationStatus previous, String action) {
+        var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        Long actorId = authentication == null ? null : userRepository.findByEmail(authentication.getName())
+                .map(User::getId).orElse(null);
+        reservationSubject.notifyObservers(new ReservationEvent(reservation.getId(),
+                reservation.getBookingReference(), reservation.getCustomer(), actorId, action,
+                previous, reservation.getStatus()));
+    }
+
+    private void validateSlot(LocalDate date, LocalTime time, int guests) {
+        if (date == null || time == null) throw new BadRequestException("A valid reservation date and time are required");
+        if (guests < 1 || guests > 200) throw new BadRequestException("Guest count must be between 1 and 200");
+        if (time.isBefore(LocalTime.of(11, 0)) || time.isAfter(LocalTime.of(21, 0)))
+            throw new BadRequestException("Reservation start time must be between 11:00 and 21:00");
+        if (!date.atTime(time).isAfter(LocalDateTime.now(java.time.ZoneId.of("Asia/Colombo"))))
+            throw new BadRequestException("Reservation date and time must be in the future");
     }
 
     // ---- Helpers ----

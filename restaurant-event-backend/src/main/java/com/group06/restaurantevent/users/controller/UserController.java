@@ -1,51 +1,48 @@
 package com.group06.restaurantevent.users.controller;
 
-import com.group06.restaurantevent.users.entity.Role;
-import com.group06.restaurantevent.users.entity.User;
-import com.group06.restaurantevent.users.repository.UserRepository;
-import lombok.Data;
+import com.group06.restaurantevent.common.response.ApiResponse;
+import com.group06.restaurantevent.users.dto.request.ChangePasswordRequest;
+import com.group06.restaurantevent.users.dto.request.UpdateProfileRequest;
+import com.group06.restaurantevent.users.dto.response.UserProfileResponse;
+import com.group06.restaurantevent.users.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
+@Tag(name = "Users")
+@SecurityRequirement(name = "bearerAuth")
 public class UserController {
 
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     @GetMapping("/me")
-    public ResponseEntity<Map<String, Object>> getProfile(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(Map.of(
-                "id", user.getId(),
-                "fullName", user.getFullName(),
-                "email", user.getEmail(),
-                "phone", user.getPhone() != null ? user.getPhone() : "",
-                "roles", user.getRoles().stream().map(Role::getName).toList()
-        ));
+    @Operation(summary = "Get my profile")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> getProfile(@AuthenticationPrincipal UserDetails principal) {
+        return ResponseEntity.ok(ApiResponse.success(userService.getProfile(principal.getUsername())));
     }
 
     @PutMapping("/me")
-    public ResponseEntity<Map<String, Object>> updateProfile(@AuthenticationPrincipal User user,
-                                                             @RequestBody UpdateProfileRequest req) {
-        user.setFullName(req.getFullName());
-        if (req.getPhone() != null) user.setPhone(req.getPhone());
-        userRepository.save(user);
-        return ResponseEntity.ok(Map.of(
-                "id", user.getId(),
-                "fullName", user.getFullName(),
-                "email", user.getEmail(),
-                "phone", user.getPhone() != null ? user.getPhone() : ""
-        ));
+    @Operation(summary = "Update my name and phone")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> updateProfile(@AuthenticationPrincipal UserDetails principal,
+                                                                         @Valid @RequestBody UpdateProfileRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Profile updated",
+                userService.updateProfile(principal.getUsername(), req)));
     }
 
-    @Data
-    public static class UpdateProfileRequest {
-        private String fullName;
-        private String phone;
+    @PutMapping("/me/password")
+    @Operation(summary = "Change my password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(@AuthenticationPrincipal UserDetails principal,
+                                                            @Valid @RequestBody ChangePasswordRequest req) {
+        userService.changePassword(principal.getUsername(), req);
+        return ResponseEntity.ok(ApiResponse.success("Password changed", null));
     }
 }

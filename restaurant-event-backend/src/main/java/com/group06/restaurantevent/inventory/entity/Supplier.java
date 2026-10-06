@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "suppliers")
@@ -31,6 +32,12 @@ public class Supplier {
 
     @Column(length = 500)
     private String address;
+
+    @Column(name = "supplied_products", length = 500)
+    private String suppliedProducts;
+
+    @Column(name = "joined_date")
+    private LocalDate joinedDate;
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;

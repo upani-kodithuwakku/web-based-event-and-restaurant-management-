@@ -1,9 +1,13 @@
 package com.group06.restaurantevent.notifications.service;
 
+import com.group06.restaurantevent.common.exception.ForbiddenException;
 import com.group06.restaurantevent.common.exception.ResourceNotFoundException;
 import com.group06.restaurantevent.notifications.dto.response.NotificationResponse;
 import com.group06.restaurantevent.notifications.entity.Notification;
+import com.group06.restaurantevent.notifications.mapper.NotificationMapper;
 import com.group06.restaurantevent.notifications.repository.NotificationRepository;
+import com.group06.restaurantevent.users.entity.User;
+import com.group06.restaurantevent.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,32 +19,40 @@ import java.util.List;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final UserRepository userRepository;
+    private final NotificationMapper notificationMapper;
 
-    public List<NotificationResponse> listForUser(Long userId) {
-        return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId)
-                .stream().map(this::toResponse).toList();
+    @Transactional(readOnly = true)
+    public List<NotificationResponse> listForUser(String email) {
+        return notificationRepository.findByUserIdOrderByCreatedAtDesc(findActiveUser(email).getId())
+                .stream().map(notificationMapper::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public long unreadCount(String email) {
+        return notificationRepository.countByUserIdAndIsReadFalse(findActiveUser(email).getId());
     }
 
     @Transactional
-    public NotificationResponse markRead(Long id, Long userId) {
+    public NotificationResponse markRead(Long id, String email) {
+        Long userId = findActiveUser(email).getId();
         Notification n = notificationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
+        if (!n.getUser().getId().equals(userId))
+            throw new ForbiddenException("Access denied");
         n.setRead(true);
-        return toResponse(notificationRepository.save(n));
+        return notificationMapper.toResponse(notificationRepository.save(n));
     }
 
     @Transactional
-    public void clearAll(Long userId) {
-        List<Notification> notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
-        notifications.forEach(n -> n.setRead(true));
-        notificationRepository.saveAll(notifications);
+    public void markAllRead(String email) {
+        List<Notification> unread = notificationRepository.findByUserIdAndIsReadFalse(findActiveUser(email).getId());
+        unread.forEach(n -> n.setRead(true));
+        notificationRepository.saveAll(unread);
     }
 
-    private NotificationResponse toResponse(Notification n) {
-        return NotificationResponse.builder()
-                .id(n.getId()).userId(n.getUser().getId())
-                .title(n.getTitle()).message(n.getMessage())
-                .type(n.getType()).isRead(n.isRead())
-                .createdAt(n.getCreatedAt()).build();
+    private User findActiveUser(String email) {
+        return userRepository.findByEmailAndIsActiveTrue(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
     }
 }

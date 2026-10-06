@@ -117,11 +117,15 @@
     </dependencies>
 
     <build>
+        <!-- Keep generated classes out of macOS cloud sync, which can create
+             cloud-only duplicate .class files that block Spring scanning. -->
+        <directory>${project.basedir}/target.nosync</directory>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
+                    <mainClass>com.group06.restaurantevent.RestaurantEventApplication</mainClass>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>

@@ -50,9 +50,9 @@ public class InventoryController {
 
     @PatchMapping("/items/{id}/adjust")
     public ResponseEntity<InventoryItemResponse> adjustStock(@PathVariable Long id,
-                                                             @RequestBody Map<String, Object> body) {
-        BigDecimal delta = new BigDecimal(body.get("delta").toString());
-        String note = (String) body.getOrDefault("note", "Manual adjustment");
+                                                             @Valid @RequestBody com.group06.restaurantevent.inventory.dto.request.AdjustStockRequest body) {
+        BigDecimal delta = body.delta();
+        String note = body.note() == null ? "Manual adjustment" : body.note();
         return ResponseEntity.ok(inventoryService.adjustStock(id, delta, note));
     }
 

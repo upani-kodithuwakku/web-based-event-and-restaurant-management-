@@ -32,6 +32,8 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
+        request.setEmail(request.getEmail().trim().toLowerCase(java.util.Locale.ROOT));
+        request.setFullName(request.getFullName().trim());
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new ConflictException("Email already registered: " + request.getEmail());
         }

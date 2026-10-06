@@ -1,0 +1,9 @@
+.DS_Store
+**/.env
+**/.env.local
+**/target/
+**/target.nosync/
+**/node_modules
+**/node_modules.nosync/
+**/dist/
+*.log
